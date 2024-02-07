@@ -63,6 +63,7 @@ package service // import "github.com/kardianos/service"
 
 import (
 	"errors"
+	"path/filepath"
 	"fmt"
 )
 
