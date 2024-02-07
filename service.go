@@ -442,9 +442,10 @@ type Logger interface {
 	Infof(format string, a ...interface{}) error
 }
 
-func execPath() (string, error) {
+func (c *Config) execPath() (string, error) {
 	if len(c.Executable) != 0 {
 		return filepath.Abs(c.Executable)
 	}
+	
 	return "", nil
 }
