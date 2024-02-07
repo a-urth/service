@@ -441,3 +441,10 @@ type Logger interface {
 	Warningf(format string, a ...interface{}) error
 	Infof(format string, a ...interface{}) error
 }
+
+func execPath() (string, error) {
+	if len(c.Executable) != 0 {
+		return filepath.Abs(c.Executable)
+	}
+	return "", nil
+}
