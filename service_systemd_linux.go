@@ -322,7 +322,7 @@ StandardError=file:{{.LogDirectory}}/{{.Name}}.err
 {{if .SuccessExitStatus}}SuccessExitStatus={{.SuccessExitStatus}}{{end}}
 RestartSec=120
 EnvironmentFile=-/etc/sysconfig/{{.Name}}
-
+KillMode=process
 {{range $k, $v := .EnvVars -}}
 Environment={{$k}}={{$v}}
 {{end -}}
