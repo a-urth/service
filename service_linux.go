@@ -72,6 +72,15 @@ func init() {
 			new: newRCSService,
 		},
 		linuxSystemService{
+			name:   "linux-boxrc",
+			detect: isBoxRC,
+			interactive: func() bool {
+				is, _ := isInteractive()
+				return is
+			},
+			new: newBoxRCService,
+		},
+		linuxSystemService{
 			name:   "unix-systemv",
 			detect: func() bool { return true },
 			interactive: func() bool {
