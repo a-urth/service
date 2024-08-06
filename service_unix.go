@@ -10,10 +10,9 @@ package service
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log/syslog"
 	"os/exec"
+	"strings"
 	"syscall"
 )
 
@@ -70,27 +69,13 @@ func runWithOutput(command string, arguments ...string) (int, string, error) {
 func runCommand(command string, readStdout bool, arguments ...string) (int, string, error) {
 	cmd := exec.Command(command, arguments...)
 
-	var output string
-	var stdout io.ReadCloser
-	var err error
+	out, errOut := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
 
 	if readStdout {
-		// Connect pipe to read Stdout
-		stdout, err = cmd.StdoutPipe()
-
-		if err != nil {
-			// Failed to connect pipe
-			return 0, "", fmt.Errorf("%q failed to connect stdout pipe: %v", command, err)
-		}
+		cmd.Stdout = out
 	}
 
-	// Connect pipe to read Stderr
-	stderr, err := cmd.StderrPipe()
-
-	if err != nil {
-		// Failed to connect pipe
-		return 0, "", fmt.Errorf("%q failed to connect stderr pipe: %v", command, err)
-	}
+	cmd.Stderr = errOut
 
 	// Do not use cmd.Run()
 	if err := cmd.Start(); err != nil {
@@ -98,37 +83,27 @@ func runCommand(command string, readStdout bool, arguments ...string) (int, stri
 		return 0, "", fmt.Errorf("%q failed: %v", command, err)
 	}
 
-	// Zero exit status
-	// Darwin: launchctl can fail with a zero exit status,
-	// so check for emtpy stderr
-	if command == "launchctl" {
-		slurp, _ := ioutil.ReadAll(stderr)
-		if len(slurp) > 0 && !bytes.HasSuffix(slurp, []byte("Operation now in progress\n")) {
-			return 0, "", fmt.Errorf("%q failed with stderr: %s", command, slurp)
-		}
-	}
-
-	if readStdout {
-		out, err := ioutil.ReadAll(stdout)
-		if err != nil {
-			return 0, "", fmt.Errorf("%q failed while attempting to read stdout: %v", command, err)
-		} else if len(out) > 0 {
-			output = string(out)
-		}
-	}
-
 	if err := cmd.Wait(); err != nil {
 		exitStatus, ok := isExitError(err)
 		if ok {
 			// Command didn't exit with a zero exit status.
-			return exitStatus, output, err
+			return exitStatus, out.String(), err
 		}
 
 		// An error occurred and there is no exit status.
-		return 0, output, fmt.Errorf("%q failed: %v", command, err)
+		return 0, out.String(), fmt.Errorf("%q failed: %v", command, err)
 	}
 
-	return 0, output, nil
+	// Zero exit status
+	// Darwin: launchctl can fail with a zero exit status,
+	// so check for emtpy stderr
+	if command == "launchctl" {
+		if errOut.Len() > 0 && !strings.HasSuffix(errOut.String(), "Operation now in progress\n") {
+			return 0, "", fmt.Errorf("%q failed with stderr: %s", command, errOut.String())
+		}
+	}
+
+	return 0, out.String(), nil
 }
 
 func isExitError(err error) (int, bool) {
