@@ -10,9 +10,9 @@ package service
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log/syslog"
 	"os/exec"
-	"strings"
 	"syscall"
 )
 
@@ -69,13 +69,16 @@ func runWithOutput(command string, arguments ...string) (int, string, error) {
 func runCommand(command string, readStdout bool, arguments ...string) (int, string, error) {
 	cmd := exec.Command(command, arguments...)
 
-	out, errOut := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+	out := bytes.NewBuffer(nil)
 
 	if readStdout {
 		cmd.Stdout = out
 	}
 
-	cmd.Stderr = errOut
+	errp, err := cmd.StderrPipe()
+	if err != nil {
+		return 0, "", fmt.Errorf("cmd stderr pipe: %w", err)
+	}
 
 	// Do not use cmd.Run()
 	if err := cmd.Start(); err != nil {
@@ -98,8 +101,9 @@ func runCommand(command string, readStdout bool, arguments ...string) (int, stri
 	// Darwin: launchctl can fail with a zero exit status,
 	// so check for emtpy stderr
 	if command == "launchctl" {
-		if errOut.Len() > 0 && !strings.HasSuffix(errOut.String(), "Operation now in progress\n") {
-			return 0, "", fmt.Errorf("%q failed with stderr: %s", command, errOut.String())
+		slurp, _ := io.ReadAll(errp)
+		if len(slurp) > 0 && !bytes.HasSuffix(slurp, []byte("Operation now in progress\n")) {
+			return 0, "", fmt.Errorf("%q failed with stderr: %s", command, slurp)
 		}
 	}
 
