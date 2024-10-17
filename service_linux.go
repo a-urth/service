@@ -7,7 +7,6 @@ package service
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 )
@@ -36,65 +35,48 @@ func (sc linuxSystemService) New(i Interface, c *Config) (Service, error) {
 
 func init() {
 	ChooseSystem(linuxSystemService{
-		name:   "linux-systemd",
-		detect: isSystemd,
-		interactive: func() bool {
-			is, _ := isInteractive()
-			return is
-		},
-		new: newSystemdService,
+		name:        "linux-systemd",
+		detect:      isSystemd,
+		interactive: isInteractive,
+		new:         newSystemdService,
 	},
 		linuxSystemService{
-			name:   "linux-upstart",
-			detect: isUpstart,
-			interactive: func() bool {
-				is, _ := isInteractive()
-				return is
-			},
-			new: newUpstartService,
+			name:        "linux-upstart",
+			detect:      isUpstart,
+			interactive: isInteractive,
+			new:         newUpstartService,
 		},
 		linuxSystemService{
-			name:   "linux-openrc",
-			detect: isOpenRC,
-			interactive: func() bool {
-				is, _ := isInteractive()
-				return is
-			},
-			new: newOpenRCService,
+			name:        "linux-openrc",
+			detect:      isOpenRC,
+			interactive: isInteractive,
+			new:         newOpenRCService,
 		},
 		linuxSystemService{
-			name:   "linux-rcs",
-			detect: isRCS,
-			interactive: func() bool {
-				is, _ := isInteractive()
-				return is
-			},
-			new: newRCSService,
+			name:        "linux-rcs",
+			detect:      isRCS,
+			interactive: isInteractive,
+			new:         newRCSService,
 		},
 		linuxSystemService{
-			name:   "linux-boxrc",
-			detect: isBoxRC,
-			interactive: func() bool {
-				is, _ := isInteractive()
-				return is
-			},
-			new: newBoxRCService,
+			name:        "linux-boxrc",
+			detect:      isBoxRC,
+			interactive: isInteractive,
+			new:         newBoxRCService,
 		},
 		linuxSystemService{
-			name:   "unix-systemv",
-			detect: func() bool { return true },
-			interactive: func() bool {
-				is, _ := isInteractive()
-				return is
-			},
-			new: newSystemVService,
+			name:        "linux-systemv",
+			detect:      func() bool { return true },
+			interactive: isInteractive,
+			new:         newSystemVService,
 		},
 	)
 }
 
 func binaryName(pid int) (string, error) {
 	statPath := fmt.Sprintf("/proc/%d/stat", pid)
-	dataBytes, err := ioutil.ReadFile(statPath)
+
+	dataBytes, err := os.ReadFile(statPath)
 	if err != nil {
 		return "", err
 	}
@@ -106,23 +88,22 @@ func binaryName(pid int) (string, error) {
 	return data[binStart : binStart+binEnd], nil
 }
 
-func isInteractive() (bool, error) {
+func isInteractive() bool {
+	// we assume we always interactive when containerised
+	// if function returns error we cannot determine whether we in container or not so we assume that not
 	inContainer, err := isInContainer(cgroupFile)
-	if err != nil {
-		return false, err
+	if err == nil && inContainer {
+		return true
 	}
 
-	if inContainer {
-		return true, nil
-	}
-
+	// parent pid 1 means we started under init system of some sorts
 	ppid := os.Getppid()
 	if ppid == 1 {
-		return false, nil
+		return false
 	}
 
 	binary, _ := binaryName(ppid)
-	return binary != "systemd", nil
+	return binary != "systemd"
 }
 
 // isInContainer checks if the service is being executed in docker or lxc
@@ -134,7 +115,9 @@ func isInContainer(cgroupPath string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	defer f.Close()
+
 	scan := bufio.NewScanner(f)
 
 	lines := 0
@@ -144,6 +127,7 @@ func isInContainer(cgroupPath string) (bool, error) {
 		}
 		lines++
 	}
+
 	if err := scan.Err(); err != nil {
 		return false, err
 	}

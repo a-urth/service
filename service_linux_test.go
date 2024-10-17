@@ -6,7 +6,6 @@ package service
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -14,7 +13,7 @@ import (
 // createTestCgroupFiles creates mock files for tests
 func createTestCgroupFiles() (*os.File, *os.File, error) {
 	// docker cgroup setup
-	hDockerGrp, err := ioutil.TempFile("", "*")
+	hDockerGrp, err := os.CreateTemp("", "*")
 	if err != nil {
 		return nil, nil, errors.New("docker tempfile create failed")
 	}
@@ -24,7 +23,7 @@ func createTestCgroupFiles() (*os.File, *os.File, error) {
 	}
 
 	// linux cgroup setup
-	hLinuxGrp, err := ioutil.TempFile("", "*")
+	hLinuxGrp, err := os.CreateTemp("", "*")
 	if err != nil {
 		return nil, nil, errors.New("\"normal\" tempfile  create failed")
 	}
@@ -100,11 +99,10 @@ func Test_isInteractive(t *testing.T) {
 
 	// TEST
 	tests := []struct {
-		name    string
-		before  func()
-		after   func()
-		want    bool
-		wantErr bool
+		name   string
+		before func()
+		after  func()
+		want   bool
 	}{
 		{"docker",
 			func() {
@@ -114,7 +112,7 @@ func Test_isInteractive(t *testing.T) {
 			func() {
 				cgroupFile = <-strStack
 			},
-			true, false,
+			true,
 		},
 		{"linux",
 			func() {
@@ -124,18 +122,25 @@ func Test_isInteractive(t *testing.T) {
 			func() {
 				cgroupFile = <-strStack
 			},
-			true, false,
+			true,
+		},
+		{"none",
+			func() {
+				strStack <- cgroupFile
+				cgroupFile = "non-existing-file"
+			},
+			func() {
+				cgroupFile = <-strStack
+			},
+			true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.before()
-			got, err := isInteractive()
+			got := isInteractive()
 			tt.after()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("isInteractive() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+
 			if got != tt.want {
 				t.Errorf("isInteractive() = %v, want %v", got, tt.want)
 			}
