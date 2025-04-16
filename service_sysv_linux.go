@@ -15,6 +15,12 @@ import (
 	"time"
 )
 
+func isSysV() bool {
+	_, err := os.Stat("/etc/init.d")
+
+	return err == nil
+}
+
 type sysv struct {
 	i        Interface
 	platform string
@@ -152,7 +158,7 @@ func (s *sysv) Run() (err error) {
 }
 
 func (s *sysv) Status() (Status, error) {
-	_, out, err := runWithOutput("service", s.Name, "status")
+	_, out, err := runWithOutput("/etc/init.d/"+s.Name, "status")
 	if err != nil {
 		return StatusUnknown, err
 	}
@@ -168,11 +174,11 @@ func (s *sysv) Status() (Status, error) {
 }
 
 func (s *sysv) Start() error {
-	return run("service", s.Name, "start")
+	return run("/etc/init.d/"+s.Name, "start")
 }
 
 func (s *sysv) Stop() error {
-	return run("service", s.Name, "stop")
+	return run("/etc/init.d/"+s.Name, "stop")
 }
 
 func (s *sysv) Restart() error {

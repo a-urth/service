@@ -66,7 +66,7 @@ func init() {
 		},
 		linuxSystemService{
 			name:        "linux-systemv",
-			detect:      func() bool { return true },
+			detect:      isSysV,
 			interactive: isInteractive,
 			new:         newSystemVService,
 		},
